@@ -196,13 +196,13 @@ python web-to-md-proxy.py
 ---
 
 ## 🖼️ 界面预览
-- 产品界面：<br>
+- 产品界面<br>
   <img src="public/产品界面1.png" width="90%" />
-- 可切换主题：<br>
+- 可切换主题<br>
   <img src="public/产品界面3-主题切换.png" width="90%" />
-- 支持多格式导出：<br>
+- 支持多格式导出<br>
   <img src="public/产品界面-多格式导出.png" width="90%" />
-- 支持10种语言：<br>
+- 支持10种语言<br>
   <img src="public/产品界面-多语言支持.png" width="90%" />
 ---
 
