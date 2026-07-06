@@ -1,0 +1,1611 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SelfDaily 日记编辑器</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f5f0;
+      --panel: #fffdf8;
+      --panel-strong: #f1eadf;
+      --text: #26231f;
+      --muted: #6f6a61;
+      --line: #dfd8cb;
+      --accent: #287c6b;
+      --accent-strong: #155d50;
+      --coral: #c86442;
+      --gold: #b7892f;
+      --blue: #3d6d99;
+      --shadow: 0 16px 42px rgba(38, 35, 31, 0.08);
+      --radius: 8px;
+      --font: "Inter", "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      --mono: "Cascadia Code", "Consolas", monospace;
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #171815;
+      --panel: #21221f;
+      --panel-strong: #2b2b27;
+      --text: #f1eee6;
+      --muted: #b4aea1;
+      --line: #3c3a34;
+      --accent: #55b89e;
+      --accent-strong: #8bd7c2;
+      --coral: #e08a68;
+      --gold: #d4ad57;
+      --blue: #76a7d4;
+      --shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 7px;
+      min-height: 36px;
+      padding: 0 11px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #bfb5a4;
+      background: #faf6ed;
+    }
+
+    button.active {
+      border-color: var(--accent);
+      background: #e7f1ea;
+      color: var(--accent-strong);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .icon-btn {
+      width: 36px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .primary:hover {
+      background: var(--accent-strong);
+      border-color: var(--accent-strong);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 58px 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 253, 248, 0.92);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 208px;
+      font-weight: 760;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .search {
+      flex: 1;
+      max-width: 560px;
+      position: relative;
+    }
+
+    .search input {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      padding: 0 14px 0 38px;
+      color: var(--text);
+    }
+
+    [data-theme="dark"] .search input,
+    [data-theme="dark"] .field select,
+    [data-theme="dark"] .field input,
+    [data-theme="dark"] .markdown-input,
+    [data-theme="dark"] .live-preview,
+    [data-theme="dark"] button,
+    [data-theme="dark"] .tag,
+    [data-theme="dark"] .stat,
+    [data-theme="dark"] .prompt {
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    [data-theme="dark"] button:hover {
+      background: var(--panel-strong);
+    }
+
+    [data-theme="dark"] .topbar,
+    [data-theme="dark"] .sidebar,
+    [data-theme="dark"] .inspector,
+    [data-theme="dark"] .statusbar,
+    [data-theme="dark"] .md-toolbar {
+      background: var(--bg);
+    }
+
+    [data-theme="dark"] .live-preview blockquote {
+      background: #1d352f;
+      color: #c9eee3;
+    }
+
+    [data-theme="dark"] .live-preview pre {
+      background: #161715;
+    }
+
+    .search span {
+      position: absolute;
+      left: 13px;
+      top: 9px;
+      color: var(--muted);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 292px minmax(360px, 1fr) 380px;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto auto 1fr;
+      border-right: 1px solid var(--line);
+      background: #fbf8f1;
+      overflow: hidden;
+    }
+
+    .sidebar-head {
+      padding: 18px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .date-picker {
+      min-width: 0;
+      max-width: calc(100% - 36px);
+      margin: 0 18px 16px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: var(--radius);
+    }
+
+    .date-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .week-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    .day {
+      inline-size: 100%;
+      min-width: 0;
+      min-height: 0;
+      padding: 0;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      font-size: 13px;
+      color: var(--muted);
+      background: transparent;
+    }
+
+    .day.has-entry {
+      background: #e7f1ea;
+      color: var(--accent-strong);
+    }
+
+    .day.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .day.outside {
+      color: #bbb2a5;
+    }
+
+    .entry-list {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 0 10px 18px;
+    }
+
+    .entry-item {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+      display: grid;
+      gap: 7px;
+      padding: 12px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+
+    .entry-item:hover {
+      background: #fff;
+      border-color: var(--line);
+    }
+
+    .entry-item.active {
+      background: var(--panel);
+      border-color: #b6d4ca;
+      box-shadow: var(--shadow);
+    }
+
+    .empty-state {
+      padding: 18px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .entry-title {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 720;
+    }
+
+    .entry-title span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .entry-date {
+      flex: 0 0 auto;
+    }
+
+    .entry-date,
+    .entry-excerpt {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .entry-excerpt {
+      min-width: 0;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .tag-line {
+      min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: #fff;
+      font-size: 12px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tag.green { border-color: #b8d6c9; color: var(--accent-strong); background: #edf7f2; }
+    .tag.coral { border-color: #e6c5b6; color: #9a452a; background: #fff0e9; }
+    .tag.gold { border-color: #ead7a8; color: #7a5b16; background: #fff7db; }
+    .tag.blue { border-color: #c3d7e8; color: #2e5d83; background: #edf6fc; }
+
+    .editor-shell {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .doc-head {
+      display: grid;
+      gap: 12px;
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .doc-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .doc-title {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font-size: 30px;
+      font-weight: 780;
+      line-height: 1.18;
+    }
+
+    .fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr;
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .field select,
+    .field input {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      padding: 0 10px;
+      color: var(--text);
+    }
+
+    .md-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f8f2e7;
+    }
+
+    .md-toolbar .divider {
+      width: 1px;
+      height: 22px;
+      background: var(--line);
+      margin: 0 3px;
+    }
+
+    .writing-area {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+      overflow: hidden;
+    }
+
+    .markdown-input,
+    .live-preview {
+      min-width: 0;
+      min-height: 0;
+      max-width: 100%;
+      overflow: auto;
+    }
+
+    .markdown-input {
+      border: 0;
+      outline: 0;
+      resize: none;
+      padding: 22px;
+      background: #fffdf8;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 15px;
+      line-height: 1.75;
+    }
+
+    .live-preview {
+      border-left: 1px solid var(--line);
+      background: #fff;
+      padding: 22px 24px;
+      line-height: 1.75;
+      overflow-wrap: anywhere;
+    }
+
+    .live-preview * {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .live-preview h1,
+    .live-preview h2,
+    .live-preview h3 {
+      line-height: 1.28;
+      margin: 0 0 14px;
+    }
+
+    .live-preview p { margin: 0 0 14px; }
+    .live-preview ul {
+      margin: 0 0 14px;
+      padding-left: 20px;
+    }
+    .live-preview blockquote {
+      margin: 0 0 16px;
+      padding: 10px 14px;
+      border-left: 3px solid var(--accent);
+      background: #eef7f3;
+      color: #33534c;
+    }
+
+    .live-preview code {
+      font-family: var(--mono);
+      font-size: 0.92em;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .live-preview pre {
+      overflow: auto;
+      max-width: 100%;
+      padding: 12px;
+      border-radius: var(--radius);
+      background: #f3efe7;
+    }
+
+    .live-preview table {
+      width: 100%;
+      max-width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 16px;
+      table-layout: fixed;
+    }
+
+    .live-preview th,
+    .live-preview td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+
+    .live-preview img {
+      max-width: 100%;
+      height: auto;
+      border-radius: var(--radius);
+    }
+
+    .statusbar {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      background: #faf6ed;
+    }
+
+    .inspector {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      border-left: 1px solid var(--line);
+      background: #fbf8f1;
+      overflow: auto;
+    }
+
+    .inspector-section {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-weight: 760;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .stat {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1.1;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .prompt-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .prompt {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: #3f3a33;
+      line-height: 1.5;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .time-item {
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .time-item strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .mobile-nav {
+      display: none;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      padding: 8px;
+      gap: 8px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 30;
+      min-width: 180px;
+      max-width: calc(100vw - 36px);
+      padding: 11px 14px;
+      border: 1px solid #b6d4ca;
+      border-radius: var(--radius);
+      background: #edf7f2;
+      color: var(--accent-strong);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1240px) {
+      .workspace { grid-template-columns: 292px minmax(0, 1fr); }
+      .inspector { display: none; }
+    }
+
+    @media (max-width: 1180px) {
+      .workspace { grid-template-columns: 260px minmax(320px, 1fr); }
+      .fields { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 860px) {
+      .topbar { padding: 0 12px; }
+      .brand { min-width: auto; }
+      .brand span:last-child { display: none; }
+      .search { max-width: none; }
+      .top-actions .hide-mobile { display: none; }
+      .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+      .mobile-nav { display: flex; }
+      .sidebar { display: none; }
+      .sidebar.mobile-active { display: grid; }
+      .editor-shell.mobile-list { display: none; }
+      .editor-shell.mobile-preview .markdown-input { display: none; }
+      .editor-shell.mobile-preview .live-preview { display: block; }
+      .writing-area { grid-template-columns: 1fr; }
+      .live-preview {
+        display: none;
+        border-left: 0;
+      }
+      .fields { grid-template-columns: 1fr; }
+      .doc-title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand" aria-label="SelfDaily">
+        <div class="brand-mark">S</div>
+        <span>SelfDaily</span>
+      </div>
+      <label class="search">
+        <span>⌕</span>
+        <input id="searchInput" type="search" placeholder="搜索日期、标题、标签或正文">
+      </label>
+      <div class="top-actions">
+        <button id="themeBtn" class="icon-btn" title="切换主题">◐</button>
+        <label for="importInput" class="hide-mobile" title="导入 Markdown">导入</label>
+        <input id="importInput" type="file" accept=".md,.markdown,.txt,.json">
+        <button id="exportBtn" class="hide-mobile" title="导出当前日记">导出</button>
+        <button id="backupBtn" class="hide-mobile" title="导出全部备份">备份</button>
+        <button id="deleteBtn" class="hide-mobile" title="删除当前日记">删除</button>
+        <button id="saveBtn" class="primary">保存日记</button>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <nav class="mobile-nav" aria-label="移动端视图切换">
+        <button id="mobileEditBtn" class="primary" data-view="edit">编辑</button>
+        <button id="mobileListBtn" data-view="list">日期</button>
+        <button id="mobilePreviewBtn" data-view="preview">预览</button>
+      </nav>
+
+      <aside id="sidebar" class="sidebar" aria-label="日记列表">
+        <div class="sidebar-head">
+          <button id="newTodayBtn" class="primary" style="flex:1;">新建今天</button>
+          <button id="newDateBtn" class="icon-btn" title="新建指定日期">＋</button>
+        </div>
+
+        <div class="date-picker">
+          <div class="date-row">
+            <button id="prevMonthBtn" class="icon-btn" title="上个月">‹</button>
+            <strong id="monthLabel">2026 年 7 月</strong>
+            <button id="nextMonthBtn" class="icon-btn" title="下个月">›</button>
+          </div>
+          <div id="calendarGrid" class="week-grid" aria-label="日期选择"></div>
+        </div>
+
+        <div id="entryList" class="entry-list"></div>
+      </aside>
+
+      <section id="editorShell" class="editor-shell" aria-label="日记编辑器">
+        <div class="doc-head">
+          <div class="doc-meta">
+            <span id="dateLabel">今天</span>
+            <span id="saveHint">等待输入</span>
+          </div>
+          <input id="titleInput" class="doc-title" aria-label="日记标题" placeholder="今天的标题">
+          <div class="fields">
+            <div class="field">
+              <label for="moodSelect">心情</label>
+              <select id="moodSelect">
+                <option>平静</option>
+                <option>开心</option>
+                <option>疲惫</option>
+                <option>焦虑</option>
+                <option>兴奋</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="energySelect">能量</label>
+              <select id="energySelect">
+                <option>中等</option>
+                <option>很高</option>
+                <option>偏低</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="tagsInput">标签</label>
+              <input id="tagsInput" placeholder="项目, 阅读, 复盘">
+            </div>
+          </div>
+        </div>
+
+        <div class="md-toolbar" aria-label="Markdown 工具栏">
+          <button id="undoBtn" title="撤销">↶</button>
+          <button id="redoBtn" title="重做">↷</button>
+          <span class="divider"></span>
+          <button data-format="bold" title="加粗"><strong>B</strong></button>
+          <button data-format="italic" title="斜体"><em>I</em></button>
+          <button data-format="heading" title="标题">H</button>
+          <button data-format="quote" title="引用">❝</button>
+          <span class="divider"></span>
+          <button data-format="task" title="任务列表">☑</button>
+          <button data-format="link" title="链接">Link</button>
+          <button data-format="table" title="表格">Table</button>
+          <span class="divider"></span>
+          <button id="dailyTemplateBtn">今日模板</button>
+          <button id="reviewTemplateBtn">复盘模板</button>
+        </div>
+
+        <div class="writing-area">
+          <textarea id="contentInput" class="markdown-input" aria-label="Markdown 正文" spellcheck="false"></textarea>
+          <article id="preview" class="live-preview" aria-label="Markdown 预览"></article>
+        </div>
+
+        <footer class="statusbar">
+          <span id="countLabel">0 字 · 预计阅读 1 分钟</span>
+          <span id="fileLabel">保存格式：YYYY-MM-DD.md</span>
+        </footer>
+      </section>
+
+      <aside class="inspector" aria-label="日记辅助信息">
+        <section class="inspector-section">
+          <div class="section-title">
+            <span>本周概览</span>
+            <button id="clearSearchBtn" class="icon-btn" title="清空搜索">×</button>
+          </div>
+          <div id="statsGrid" class="stats"></div>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-title">
+            <span>快速提示</span>
+          </div>
+          <div id="promptList" class="prompt-list"></div>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-title">
+            <span>最近更新</span>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </section>
+      </aside>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const STORAGE_KEY = 'selfdaily.entries.v1';
+    const SELECTED_DATE_KEY = 'selfdaily.selectedDate.v1';
+    const THEME_KEY = 'selfdaily.theme.v1';
+    const todayId = toDateId(new Date());
+
+    const els = {
+      body: document.body,
+      search: document.getElementById('searchInput'),
+      themeBtn: document.getElementById('themeBtn'),
+      importInput: document.getElementById('importInput'),
+      exportBtn: document.getElementById('exportBtn'),
+      backupBtn: document.getElementById('backupBtn'),
+      deleteBtn: document.getElementById('deleteBtn'),
+      saveBtn: document.getElementById('saveBtn'),
+      newTodayBtn: document.getElementById('newTodayBtn'),
+      newDateBtn: document.getElementById('newDateBtn'),
+      prevMonthBtn: document.getElementById('prevMonthBtn'),
+      nextMonthBtn: document.getElementById('nextMonthBtn'),
+      monthLabel: document.getElementById('monthLabel'),
+      calendarGrid: document.getElementById('calendarGrid'),
+      entryList: document.getElementById('entryList'),
+      sidebar: document.getElementById('sidebar'),
+      editorShell: document.getElementById('editorShell'),
+      dateLabel: document.getElementById('dateLabel'),
+      saveHint: document.getElementById('saveHint'),
+      title: document.getElementById('titleInput'),
+      mood: document.getElementById('moodSelect'),
+      energy: document.getElementById('energySelect'),
+      tags: document.getElementById('tagsInput'),
+      content: document.getElementById('contentInput'),
+      preview: document.getElementById('preview'),
+      countLabel: document.getElementById('countLabel'),
+      fileLabel: document.getElementById('fileLabel'),
+      statsGrid: document.getElementById('statsGrid'),
+      promptList: document.getElementById('promptList'),
+      timeline: document.getElementById('timeline'),
+      clearSearchBtn: document.getElementById('clearSearchBtn'),
+      toast: document.getElementById('toast'),
+      mobileEditBtn: document.getElementById('mobileEditBtn'),
+      mobileListBtn: document.getElementById('mobileListBtn'),
+      mobilePreviewBtn: document.getElementById('mobilePreviewBtn')
+    };
+
+    const prompts = [
+      '今天最值得保留下来的一个瞬间是什么？',
+      '有没有一个小决定，让明天变轻松一点？',
+      '今天学到的东西，能不能写成一句给未来自己的提醒？'
+    ];
+
+    const defaultContent = `# 今天做了什么
+
+- 
+
+## 今日收获
+
+
+## 明天继续
+
+- `;
+
+    const reviewTemplate = `# 今日复盘
+
+## 一个有效动作
+
+
+## 一个卡点
+
+
+## 一个明天继续推进的小任务
+
+- `;
+
+    const store = {
+      read() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      },
+      write(entries) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      }
+    };
+
+    const state = {
+      entries: store.read(),
+      selectedDate: localStorage.getItem(SELECTED_DATE_KEY) || todayId,
+      visibleMonth: startOfMonth(localStorage.getItem(SELECTED_DATE_KEY) || todayId),
+      query: '',
+      mobileView: 'edit',
+      saveTimer: null,
+      pendingSaveDate: null,
+      toastTimer: null
+    };
+
+    boot();
+
+    function boot() {
+      applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+      if (!state.entries.length) seedFirstEntry();
+      ensureEntry(state.selectedDate);
+      bindEvents();
+      render();
+    }
+
+    function bindEvents() {
+      els.search.addEventListener('input', () => {
+        state.query = els.search.value.trim().toLowerCase();
+        renderEntryList();
+      });
+      els.clearSearchBtn.addEventListener('click', () => {
+        els.search.value = '';
+        state.query = '';
+        renderEntryList();
+      });
+      els.themeBtn.addEventListener('click', () => applyTheme(els.body.dataset.theme === 'dark' ? 'light' : 'dark'));
+      els.saveBtn.addEventListener('click', () => saveCurrentEntry(true));
+      els.newTodayBtn.addEventListener('click', () => selectDate(todayId));
+      els.newDateBtn.addEventListener('click', createDateFromPrompt);
+      els.prevMonthBtn.addEventListener('click', () => moveMonth(-1));
+      els.nextMonthBtn.addEventListener('click', () => moveMonth(1));
+      els.exportBtn.addEventListener('click', exportCurrentMarkdown);
+      els.backupBtn.addEventListener('click', exportBackup);
+      els.deleteBtn.addEventListener('click', deleteCurrentEntry);
+      els.importInput.addEventListener('change', importFile);
+      els.title.addEventListener('input', scheduleSave);
+      els.mood.addEventListener('change', scheduleSave);
+      els.energy.addEventListener('change', scheduleSave);
+      els.tags.addEventListener('input', scheduleSave);
+      els.content.addEventListener('input', () => {
+        updatePreview();
+        scheduleSave();
+      });
+      document.getElementById('undoBtn').addEventListener('click', () => document.execCommand('undo'));
+      document.getElementById('redoBtn').addEventListener('click', () => document.execCommand('redo'));
+      document.querySelectorAll('[data-format]').forEach(btn => {
+        btn.addEventListener('click', () => applyFormat(btn.dataset.format));
+      });
+      document.getElementById('dailyTemplateBtn').addEventListener('click', () => insertTemplate(defaultContent));
+      document.getElementById('reviewTemplateBtn').addEventListener('click', () => insertTemplate(reviewTemplate));
+      [els.mobileEditBtn, els.mobileListBtn, els.mobilePreviewBtn].forEach(btn => {
+        btn.addEventListener('click', () => setMobileView(btn.dataset.view));
+      });
+    }
+
+    function seedFirstEntry() {
+      state.entries = [{
+        date: todayId,
+        title: '把日记项目跑起来',
+        mood: '平静',
+        energy: '中等',
+        tags: ['项目', 'GitHub', 'Markdown'],
+        content: `# 今天做了什么
+
+- Clone 了 \`lengyi-markdown-editor\`
+- 确认它是一个纯前端 Markdown 编辑器
+- 开始设计 SelfDaily 的日记工作台
+
+> 目标不是立刻做复杂系统，而是先让每天记录这件事变得顺手。
+
+## 今日收获
+
+用一个已有编辑器做底座，能把精力放在“日记体验”本身：日期、标题、标签、搜索、导出和长期维护。
+
+## 明天继续
+
+- 把真实保存逻辑接起来
+- 让每一天都能独立保存为 Markdown
+- 准备第一次 Git 提交`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }];
+      store.write(state.entries);
+    }
+
+    function ensureEntry(date) {
+      let entry = getEntry(date);
+      if (entry) return entry;
+      entry = {
+        date,
+        title: date === todayId ? '今天的日记' : `${date} 日记`,
+        mood: '平静',
+        energy: '中等',
+        tags: [],
+        content: defaultContent,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      state.entries.push(entry);
+      state.entries.sort((a, b) => b.date.localeCompare(a.date));
+      store.write(state.entries);
+      return entry;
+    }
+
+    function render() {
+      renderEditor();
+      renderCalendar();
+      renderEntryList();
+      renderStats();
+      renderPrompts();
+      renderTimeline();
+      applyMobileView();
+    }
+
+    function renderEditor() {
+      const entry = ensureEntry(state.selectedDate);
+      els.dateLabel.textContent = `${formatDisplayDate(entry.date)} · ${weekdayName(entry.date)}`;
+      els.title.value = entry.title;
+      els.mood.value = entry.mood;
+      els.energy.value = entry.energy;
+      els.tags.value = entry.tags.join(', ');
+      els.content.value = entry.content;
+      els.saveHint.textContent = entry.updatedAt ? `自动保存于 ${formatTime(entry.updatedAt)}` : '等待输入';
+      els.fileLabel.textContent = `保存格式：${entry.date}.md`;
+      els.saveBtn.textContent = entry.date === todayId ? '保存今天' : '保存日记';
+      updatePreview();
+      updateCount();
+      localStorage.setItem(SELECTED_DATE_KEY, entry.date);
+    }
+
+    function renderCalendar() {
+      const monthDate = parseDateId(state.visibleMonth);
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      els.monthLabel.textContent = `${year} 年 ${month + 1} 月`;
+      const first = new Date(year, month, 1);
+      const startOffset = (first.getDay() + 6) % 7;
+      const start = new Date(year, month, 1 - startOffset);
+      const entryDates = new Set(state.entries.map(entry => entry.date));
+      const parts = ['一', '二', '三', '四', '五', '六', '日'].map(day => `<span class="day">${day}</span>`);
+      for (let i = 0; i < 42; i += 1) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + i);
+        const id = toDateId(date);
+        const classes = ['day'];
+        if (date.getMonth() !== month) classes.push('outside');
+        if (entryDates.has(id)) classes.push('has-entry');
+        if (id === state.selectedDate) classes.push('active');
+        parts.push(`<button class="${classes.join(' ')}" data-date="${id}">${date.getDate()}</button>`);
+      }
+      els.calendarGrid.innerHTML = parts.join('');
+      els.calendarGrid.querySelectorAll('button[data-date]').forEach(btn => {
+        btn.addEventListener('click', () => selectDate(btn.dataset.date));
+      });
+    }
+
+    function renderEntryList() {
+      const entries = filteredEntries();
+      if (!entries.length) {
+        els.entryList.innerHTML = '<div class="empty-state">没有找到日记。换个关键词，或者新建今天。</div>';
+        return;
+      }
+      els.entryList.innerHTML = entries.map(entry => {
+        const active = entry.date === state.selectedDate ? ' active' : '';
+        const tags = entry.tags.slice(0, 4).map((tag, index) => `<span class="tag ${tagColor(index)}">${escapeHtml(tag)}</span>`).join('');
+        return `<article class="entry-item${active}" data-date="${entry.date}">
+          <div class="entry-title">
+            <span>${escapeHtml(entry.title || '未命名日记')}</span>
+            <span class="entry-date">${relativeDate(entry.date)}</span>
+          </div>
+          <p class="entry-excerpt">${escapeHtml(excerpt(entry.content))}</p>
+          <div class="tag-line">${tags}</div>
+        </article>`;
+      }).join('');
+      els.entryList.querySelectorAll('.entry-item').forEach(item => {
+        item.addEventListener('click', () => selectDate(item.dataset.date));
+      });
+    }
+
+    function renderStats() {
+      const weekEntries = entriesThisWeek();
+      const totalChars = state.entries.reduce((sum, entry) => sum + countChars(entry.content), 0);
+      const streak = countStreak();
+      els.statsGrid.innerHTML = [
+        statCard(weekEntries.length, '本周记录'),
+        statCard(formatCompact(totalChars), '总字数'),
+        statCard(streak, '连续天')
+      ].join('');
+    }
+
+    function renderPrompts() {
+      els.promptList.innerHTML = prompts.map(prompt => `<button class="prompt" data-prompt="${escapeHtml(prompt)}">${escapeHtml(prompt)}</button>`).join('');
+      els.promptList.querySelectorAll('.prompt').forEach(btn => {
+        btn.addEventListener('click', () => insertAtCursor(`\n> ${btn.dataset.prompt}\n\n`));
+      });
+    }
+
+    function renderTimeline() {
+      const recent = [...state.entries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
+      els.timeline.innerHTML = recent.map(entry => `<div class="time-item">
+        <span>${formatShortDate(entry.date)}</span>
+        <strong>${escapeHtml(entry.title || '未命名日记')}</strong>
+      </div>`).join('');
+    }
+
+    function selectDate(date) {
+      clearTimeout(state.saveTimer);
+      saveCurrentEntry(false);
+      state.selectedDate = date;
+      state.visibleMonth = startOfMonth(date);
+      state.query = '';
+      els.search.value = '';
+      ensureEntry(date);
+      render();
+      setMobileView('edit');
+    }
+
+    function moveMonth(delta) {
+      const date = parseDateId(state.visibleMonth);
+      date.setMonth(date.getMonth() + delta);
+      state.visibleMonth = toDateId(date).slice(0, 7) + '-01';
+      renderCalendar();
+    }
+
+    function createDateFromPrompt() {
+      const input = prompt('输入日期，格式 YYYY-MM-DD', todayId);
+      if (!input) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input) || Number.isNaN(parseDateId(input).getTime())) {
+        showToast('日期格式不正确');
+        return;
+      }
+      selectDate(input);
+    }
+
+    function saveCurrentEntry(showMessage) {
+      const entry = ensureEntry(state.selectedDate);
+      entry.title = els.title.value.trim() || '未命名日记';
+      entry.mood = els.mood.value;
+      entry.energy = els.energy.value;
+      entry.tags = splitTags(els.tags.value);
+      entry.content = els.content.value;
+      entry.updatedAt = new Date().toISOString();
+      state.entries.sort((a, b) => b.date.localeCompare(a.date));
+      store.write(state.entries);
+      els.saveHint.textContent = `自动保存于 ${formatTime(entry.updatedAt)}`;
+      updateCount();
+      renderCalendar();
+      renderEntryList();
+      renderStats();
+      renderTimeline();
+      if (showMessage) showToast('已保存');
+    }
+
+    function deleteCurrentEntry() {
+      if (state.entries.length <= 1) {
+        showToast('至少保留一篇日记');
+        return;
+      }
+      const entry = getEntry(state.selectedDate);
+      if (!entry) return;
+      if (!confirm(`删除 ${entry.date} 的日记吗？`)) return;
+      state.entries = state.entries.filter(item => item.date !== entry.date);
+      store.write(state.entries);
+      state.selectedDate = state.entries[0].date;
+      state.visibleMonth = startOfMonth(state.selectedDate);
+      render();
+      showToast('已删除');
+    }
+
+    function scheduleSave() {
+      els.saveHint.textContent = '正在保存...';
+      clearTimeout(state.saveTimer);
+      state.pendingSaveDate = state.selectedDate;
+      state.saveTimer = setTimeout(() => {
+        if (state.pendingSaveDate === state.selectedDate) {
+          saveCurrentEntry(false);
+        }
+      }, 350);
+    }
+
+    function updatePreview() {
+      els.preview.innerHTML = renderMarkdown(els.content.value);
+      updateCount();
+    }
+
+    function updateCount() {
+      const chars = countChars(els.content.value);
+      const minutes = Math.max(1, Math.ceil(chars / 500));
+      els.countLabel.textContent = `${chars} 字 · 预计阅读 ${minutes} 分钟`;
+    }
+
+    function applyFormat(type) {
+      const selected = getSelectionText();
+      if (type === 'bold') return wrapSelection('**', '**', selected || '加粗文字');
+      if (type === 'italic') return wrapSelection('*', '*', selected || '斜体文字');
+      if (type === 'heading') return prefixLine('## ');
+      if (type === 'quote') return prefixLine('> ');
+      if (type === 'task') return insertAtCursor('- [ ] ');
+      if (type === 'link') return wrapSelection('[', '](https://example.com)', selected || '链接文字');
+      if (type === 'table') return insertAtCursor('\n| 项目 | 内容 |\n| --- | --- |\n|  |  |\n');
+    }
+
+    function getSelectionText() {
+      return els.content.value.slice(els.content.selectionStart, els.content.selectionEnd);
+    }
+
+    function wrapSelection(before, after, fallback) {
+      const start = els.content.selectionStart;
+      const end = els.content.selectionEnd;
+      const text = els.content.value;
+      const selected = text.slice(start, end) || fallback;
+      els.content.value = text.slice(0, start) + before + selected + after + text.slice(end);
+      els.content.focus();
+      els.content.setSelectionRange(start + before.length, start + before.length + selected.length);
+      updatePreview();
+      scheduleSave();
+    }
+
+    function prefixLine(prefix) {
+      const start = els.content.selectionStart;
+      const text = els.content.value;
+      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+      els.content.value = text.slice(0, lineStart) + prefix + text.slice(lineStart);
+      els.content.focus();
+      els.content.setSelectionRange(start + prefix.length, start + prefix.length);
+      updatePreview();
+      scheduleSave();
+    }
+
+    function insertAtCursor(value) {
+      const start = els.content.selectionStart;
+      const end = els.content.selectionEnd;
+      els.content.value = els.content.value.slice(0, start) + value + els.content.value.slice(end);
+      els.content.focus();
+      els.content.setSelectionRange(start + value.length, start + value.length);
+      updatePreview();
+      scheduleSave();
+    }
+
+    function insertTemplate(template) {
+      if (els.content.value.trim() && !confirm('用模板替换当前正文吗？')) return;
+      els.content.value = template;
+      updatePreview();
+      scheduleSave();
+    }
+
+    function exportCurrentMarkdown() {
+      saveCurrentEntry(false);
+      const entry = getEntry(state.selectedDate);
+      downloadText(`${entry.date}.md`, entry.content, 'text/markdown;charset=utf-8');
+      showToast('已导出 Markdown');
+    }
+
+    function exportBackup() {
+      saveCurrentEntry(false);
+      const payload = {
+        app: 'SelfDaily',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries: state.entries
+      };
+      downloadText(`selfdaily-backup-${todayId}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+      showToast('已导出备份');
+    }
+
+    function importFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || '');
+        if (file.name.toLowerCase().endsWith('.json')) {
+          importBackup(text);
+        } else {
+          importMarkdown(file.name, text);
+        }
+        event.target.value = '';
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    function importBackup(text) {
+      try {
+        const payload = JSON.parse(text);
+        if (!Array.isArray(payload.entries)) throw new Error('bad backup');
+        const merged = new Map(state.entries.map(entry => [entry.date, entry]));
+        payload.entries.forEach(entry => {
+          if (entry && entry.date && entry.content) merged.set(entry.date, normalizeEntry(entry));
+        });
+        state.entries = [...merged.values()].sort((a, b) => b.date.localeCompare(a.date));
+        store.write(state.entries);
+        render();
+        showToast('备份已导入');
+      } catch {
+        showToast('备份文件无法识别');
+      }
+    }
+
+    function importMarkdown(name, content) {
+      const dateMatch = name.match(/\d{4}-\d{2}-\d{2}/);
+      const date = dateMatch ? dateMatch[0] : state.selectedDate;
+      const entry = ensureEntry(date);
+      entry.title = extractTitle(content) || name.replace(/\.(md|markdown|txt)$/i, '');
+      entry.content = content;
+      entry.updatedAt = new Date().toISOString();
+      store.write(state.entries);
+      selectDate(date);
+      showToast('Markdown 已导入');
+    }
+
+    function filteredEntries() {
+      const entries = [...state.entries].sort((a, b) => b.date.localeCompare(a.date));
+      if (!state.query) return entries;
+      return entries.filter(entry => {
+        const text = [entry.date, entry.title, entry.mood, entry.energy, entry.tags.join(' '), entry.content].join(' ').toLowerCase();
+        return text.includes(state.query);
+      });
+    }
+
+    function getEntry(date) {
+      return state.entries.find(entry => entry.date === date);
+    }
+
+    function normalizeEntry(entry) {
+      return {
+        date: entry.date,
+        title: entry.title || '未命名日记',
+        mood: entry.mood || '平静',
+        energy: entry.energy || '中等',
+        tags: Array.isArray(entry.tags) ? entry.tags : splitTags(entry.tags || ''),
+        content: entry.content || '',
+        createdAt: entry.createdAt || new Date().toISOString(),
+        updatedAt: entry.updatedAt || new Date().toISOString()
+      };
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+      const html = [];
+      let listType = null;
+      let inCode = false;
+      let code = [];
+      let paragraph = [];
+
+      const flushParagraph = () => {
+        if (!paragraph.length) return;
+        html.push(`<p>${inlineMarkdown(paragraph.join(' '))}</p>`);
+        paragraph = [];
+      };
+      const closeList = () => {
+        if (!listType) return;
+        html.push(`</${listType}>`);
+        listType = null;
+      };
+
+      lines.forEach(line => {
+        if (line.startsWith('```')) {
+          if (inCode) {
+            html.push(`<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`);
+            code = [];
+            inCode = false;
+          } else {
+            flushParagraph();
+            closeList();
+            inCode = true;
+          }
+          return;
+        }
+        if (inCode) {
+          code.push(line);
+          return;
+        }
+        if (!line.trim()) {
+          flushParagraph();
+          closeList();
+          return;
+        }
+        const heading = line.match(/^(#{1,6})\s+(.*)$/);
+        if (heading) {
+          flushParagraph();
+          closeList();
+          html.push(`<h${heading[1].length}>${inlineMarkdown(heading[2])}</h${heading[1].length}>`);
+          return;
+        }
+        if (line.startsWith('> ')) {
+          flushParagraph();
+          closeList();
+          html.push(`<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`);
+          return;
+        }
+        const unordered = line.match(/^[-*]\s+(.*)$/);
+        const ordered = line.match(/^\d+\.\s+(.*)$/);
+        if (unordered || ordered) {
+          flushParagraph();
+          const nextType = unordered ? 'ul' : 'ol';
+          if (listType !== nextType) {
+            closeList();
+            listType = nextType;
+            html.push(`<${listType}>`);
+          }
+          const item = unordered ? unordered[1] : ordered[1];
+          html.push(`<li>${inlineMarkdown(item)}</li>`);
+          return;
+        }
+        paragraph.push(line.trim());
+      });
+      flushParagraph();
+      closeList();
+      if (inCode) html.push(`<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`);
+      return html.join('\n') || '<p class="empty-state">开始写一点什么吧。</p>';
+    }
+
+    function inlineMarkdown(text) {
+      return escapeHtml(text)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function splitTags(value) {
+      return String(value).split(/[,，]/).map(tag => tag.trim()).filter(Boolean);
+    }
+
+    function excerpt(content) {
+      return content.replace(/[#>*`\-[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 62) || '还没有正文。';
+    }
+
+    function extractTitle(content) {
+      const found = content.match(/^#\s+(.+)$/m);
+      return found ? found[1].trim() : '';
+    }
+
+    function countChars(value) {
+      return String(value).replace(/\s/g, '').length;
+    }
+
+    function entriesThisWeek() {
+      const today = parseDateId(todayId);
+      const start = new Date(today);
+      start.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      const end = new Date(start);
+      end.setDate(start.getDate() + 7);
+      return state.entries.filter(entry => {
+        const date = parseDateId(entry.date);
+        return date >= start && date < end;
+      });
+    }
+
+    function countStreak() {
+      const dates = new Set(state.entries.filter(entry => entry.content.trim()).map(entry => entry.date));
+      let streak = 0;
+      const cursor = parseDateId(todayId);
+      while (dates.has(toDateId(cursor))) {
+        streak += 1;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+      return streak;
+    }
+
+    function statCard(value, label) {
+      return `<div class="stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`;
+    }
+
+    function tagColor(index) {
+      return ['green', 'coral', 'gold', 'blue'][index % 4];
+    }
+
+    function downloadText(filename, text, type) {
+      const blob = new Blob([text], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        link.remove();
+        URL.revokeObjectURL(url);
+      }, 0);
+    }
+
+    function applyTheme(theme) {
+      els.body.dataset.theme = theme;
+      localStorage.setItem(THEME_KEY, theme);
+    }
+
+    function setMobileView(view) {
+      state.mobileView = view;
+      applyMobileView();
+    }
+
+    function applyMobileView() {
+      els.sidebar.classList.toggle('mobile-active', state.mobileView === 'list');
+      els.editorShell.classList.toggle('mobile-list', state.mobileView === 'list');
+      els.editorShell.classList.toggle('mobile-preview', state.mobileView === 'preview');
+      [els.mobileEditBtn, els.mobileListBtn, els.mobilePreviewBtn].forEach(btn => {
+        btn.classList.toggle('primary', btn.dataset.view === state.mobileView);
+      });
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add('show');
+      clearTimeout(state.toastTimer);
+      state.toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1800);
+    }
+
+    function toDateId(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function parseDateId(dateId) {
+      const [year, month, day] = dateId.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+
+    function startOfMonth(dateId) {
+      return dateId.slice(0, 7) + '-01';
+    }
+
+    function formatDisplayDate(dateId) {
+      const date = parseDateId(dateId);
+      return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+    }
+
+    function weekdayName(dateId) {
+      return ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][parseDateId(dateId).getDay()];
+    }
+
+    function formatTime(iso) {
+      const date = new Date(iso);
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function formatShortDate(dateId) {
+      const date = parseDateId(dateId);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
+
+    function relativeDate(dateId) {
+      if (dateId === todayId) return '今天';
+      return formatShortDate(dateId);
+    }
+
+    function formatCompact(value) {
+      return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value;
+    }
+  </script>
+</body>
+</html>
