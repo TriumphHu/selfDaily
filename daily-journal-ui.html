@@ -855,8 +855,9 @@
 
   <script>
     const STORAGE_KEY = 'selfdaily.entries.v1';
-    const SELECTED_DATE_KEY = 'selfdaily.selectedDate.v1';
+    const STORAGE_BACKUP_KEY = 'selfdaily.entries.backup.v1';
     const THEME_KEY = 'selfdaily.theme.v1';
+    const FILE_API = location.protocol === 'file:' ? 'http://127.0.0.1:5177/api/entries' : '/api/entries';
     const todayId = toDateId(new Date());
 
     const els = {
@@ -927,7 +928,7 @@
 - `;
 
     const store = {
-      read() {
+      readLocal() {
         try {
           const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
           return Array.isArray(parsed) ? parsed : [];
@@ -935,17 +936,56 @@
           return [];
         }
       },
-      write(entries) {
+      writeLocal(entries) {
+        const current = this.readLocal();
+        if (current.length) {
+          localStorage.setItem(STORAGE_BACKUP_KEY, JSON.stringify({
+            backedUpAt: new Date().toISOString(),
+            entries: current
+          }));
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      },
+      async read() {
+        const localEntries = this.readLocal();
+        try {
+          const response = await fetch(FILE_API, { cache: 'no-store' });
+          if (!response.ok) throw new Error('file store unavailable');
+          const payload = await response.json();
+          const fileEntries = Array.isArray(payload.entries) ? payload.entries : [];
+          state.fileStorageEnabled = true;
+          const merged = mergeStoredEntries(fileEntries, localEntries);
+          if (merged.changed) await this.writeRemote(merged.entries);
+          this.writeLocal(merged.entries);
+          return merged.entries;
+        } catch {
+          state.fileStorageEnabled = false;
+          return localEntries;
+        }
+      },
+      write(entries) {
+        this.writeLocal(entries);
+        if (state.fileStorageEnabled) {
+          this.writeRemote(entries).catch(error => console.warn(error));
+        }
+      },
+      async writeRemote(entries) {
+        const response = await fetch(FILE_API, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entries })
+        });
+        if (!response.ok) throw new Error('file save failed');
       }
     };
 
     const state = {
-      entries: store.read(),
-      selectedDate: localStorage.getItem(SELECTED_DATE_KEY) || todayId,
-      visibleMonth: startOfMonth(localStorage.getItem(SELECTED_DATE_KEY) || todayId),
+      entries: [],
+      selectedDate: todayId,
+      visibleMonth: startOfMonth(todayId),
       query: '',
       mobileView: 'edit',
+      fileStorageEnabled: false,
       saveTimer: null,
       pendingSaveDate: null,
       toastTimer: null
@@ -953,10 +993,10 @@
 
     boot();
 
-    function boot() {
+    async function boot() {
       applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+      state.entries = await store.read();
       if (!state.entries.length) seedFirstEntry();
-      ensureEntry(state.selectedDate);
       bindEvents();
       render();
     }
@@ -973,7 +1013,7 @@
       });
       els.themeBtn.addEventListener('click', () => applyTheme(els.body.dataset.theme === 'dark' ? 'light' : 'dark'));
       els.saveBtn.addEventListener('click', () => saveCurrentEntry(true));
-      els.newTodayBtn.addEventListener('click', () => selectDate(todayId));
+      els.newTodayBtn.addEventListener('click', () => createAndSelectEntry(todayId));
       els.newDateBtn.addEventListener('click', createDateFromPrompt);
       els.prevMonthBtn.addEventListener('click', () => moveMonth(-1));
       els.nextMonthBtn.addEventListener('click', () => moveMonth(1));
@@ -1034,20 +1074,26 @@
     function ensureEntry(date) {
       let entry = getEntry(date);
       if (entry) return entry;
-      entry = {
+      entry = createDraftEntry(date);
+      entry.createdAt = new Date().toISOString();
+      entry.updatedAt = new Date().toISOString();
+      state.entries.push(entry);
+      state.entries.sort((a, b) => b.date.localeCompare(a.date));
+      store.write(state.entries);
+      return entry;
+    }
+
+    function createDraftEntry(date) {
+      return {
         date,
         title: date === todayId ? '今天的日记' : `${date} 日记`,
         mood: '平静',
         energy: '中等',
         tags: [],
         content: defaultContent,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: '',
+        updatedAt: ''
       };
-      state.entries.push(entry);
-      state.entries.sort((a, b) => b.date.localeCompare(a.date));
-      store.write(state.entries);
-      return entry;
     }
 
     function render() {
@@ -1061,19 +1107,19 @@
     }
 
     function renderEditor() {
-      const entry = ensureEntry(state.selectedDate);
+      const savedEntry = getEntry(state.selectedDate);
+      const entry = savedEntry || createDraftEntry(state.selectedDate);
       els.dateLabel.textContent = `${formatDisplayDate(entry.date)} · ${weekdayName(entry.date)}`;
       els.title.value = entry.title;
       els.mood.value = entry.mood;
       els.energy.value = entry.energy;
       els.tags.value = entry.tags.join(', ');
       els.content.value = entry.content;
-      els.saveHint.textContent = entry.updatedAt ? `自动保存于 ${formatTime(entry.updatedAt)}` : '等待输入';
-      els.fileLabel.textContent = `保存格式：${entry.date}.md`;
+      els.saveHint.textContent = savedEntry && entry.updatedAt ? `自动保存于 ${formatTime(entry.updatedAt)}` : '尚未保存';
+      els.fileLabel.textContent = state.fileStorageEnabled ? `DailyNote/${entry.date}.md` : `浏览器缓存：${entry.date}.md`;
       els.saveBtn.textContent = entry.date === todayId ? '保存今天' : '保存日记';
       updatePreview();
       updateCount();
-      localStorage.setItem(SELECTED_DATE_KEY, entry.date);
     }
 
     function renderCalendar() {
@@ -1152,13 +1198,22 @@
     }
 
     function selectDate(date) {
-      clearTimeout(state.saveTimer);
-      saveCurrentEntry(false);
+      persistCurrentEntryIfNeeded();
       state.selectedDate = date;
       state.visibleMonth = startOfMonth(date);
       state.query = '';
       els.search.value = '';
+      render();
+      setMobileView('edit');
+    }
+
+    function createAndSelectEntry(date) {
+      persistCurrentEntryIfNeeded();
       ensureEntry(date);
+      state.selectedDate = date;
+      state.visibleMonth = startOfMonth(date);
+      state.query = '';
+      els.search.value = '';
       render();
       setMobileView('edit');
     }
@@ -1177,7 +1232,21 @@
         showToast('日期格式不正确');
         return;
       }
-      selectDate(input);
+      createAndSelectEntry(input);
+    }
+
+    function persistCurrentEntryIfNeeded() {
+      clearTimeout(state.saveTimer);
+      if (getEntry(state.selectedDate) || draftHasChanges()) saveCurrentEntry(false);
+    }
+
+    function draftHasChanges() {
+      const draft = createDraftEntry(state.selectedDate);
+      return els.title.value.trim() !== draft.title
+        || els.mood.value !== draft.mood
+        || els.energy.value !== draft.energy
+        || els.tags.value.trim() !== ''
+        || els.content.value !== draft.content;
     }
 
     function saveCurrentEntry(showMessage) {
@@ -1367,6 +1436,27 @@
 
     function getEntry(date) {
       return state.entries.find(entry => entry.date === date);
+    }
+
+    function mergeStoredEntries(fileEntries, localEntries) {
+      const merged = new Map();
+      fileEntries.forEach(entry => {
+        if (entry && entry.date) merged.set(entry.date, entry);
+      });
+      let changed = false;
+      localEntries.forEach(entry => {
+        if (!entry || !entry.date) return;
+        const saved = merged.get(entry.date);
+        if (!saved || String(entry.updatedAt || '') > String(saved.updatedAt || '')) {
+          merged.set(entry.date, entry);
+          changed = true;
+        }
+      });
+      if (fileEntries.length !== merged.size) changed = true;
+      return {
+        changed,
+        entries: [...merged.values()].sort((a, b) => b.date.localeCompare(a.date))
+      };
     }
 
     function normalizeEntry(entry) {
